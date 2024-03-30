@@ -1,0 +1,31 @@
+project = "lcars_plugin_network"
+version = 1
+author = "Frank Holler"
+
+[setup.run]
+network = "%git%/lcars_plugin_network/run/network.py %base%"
+
+[[systemd]]
+name = "lcars-network.service"
+start = false
+content = '''
+[Unit]
+Description=Netzwerk Konfiguration anpassen 
+
+[Service]
+WorkingDirectory=%base%
+ExecStart=%python% %git%/lcars_plugin_network/run/check_configuration.py %base%
+'''
+
+[[systemd]]
+name = "lcars-network.timer"
+content = '''
+[Unit]
+Description=Taegliche Pruefung auf Updates 
+
+[Timer]
+OnBootSec=15s
+
+[Install]
+WantedBy=timers.target
+'''
