@@ -72,7 +72,13 @@ async def check_ip_settings(interface: str, param: dict) -> None:
                                 await p.wait()
                         case _:
                             print(param.get('method', ''))
-                    p = await asyncio.subprocess.create_subprocess_shell(f'nmcli device up {interface}', 
+                    await asyncio.sleep(2)
+                    p = await asyncio.subprocess.create_subprocess_shell(f'nmcli c down {interface}', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+                    await p.wait()
+                    await asyncio.sleep(2)
+                    p = await asyncio.subprocess.create_subprocess_shell(f'nmcli c up {interface}', 
                                                          stderr=asyncio.subprocess.PIPE, 
                                                          stdout=asyncio.subprocess.PIPE)
                     await p.wait()
@@ -168,9 +174,14 @@ async def check_router()->None:
                                                          stderr=asyncio.subprocess.PIPE, 
                                                          stdout=asyncio.subprocess.PIPE)
     await p.wait()
+    await asyncio.sleep(10)
+    p = await asyncio.subprocess.create_subprocess_shell(f"nmcli c up {data.get('source', '')}", 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+    await p.wait()
 
 if __name__ == "__main__":
+    asyncio.run(check_router())
     asyncio.run(check_networkmanger())
     asyncio.run(check_wifi())
-    asyncio.run(check_router())
     
