@@ -72,6 +72,10 @@ async def check_ip_settings(interface: str, param: dict) -> None:
                                 await p.wait()
                         case _:
                             print(param.get('method', ''))
+                    p = await asyncio.subprocess.create_subprocess_shell(f'nmcli device up {interface}', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+                    await p.wait()
     
 async def check_wifi()->None:
     config_file = pathlib.Path(sys.argv[1]) / 'config' / 'config.toml'
@@ -109,6 +113,64 @@ async def check_wifi()->None:
         for interface, data in mode_data.items():
             tg.create_task(check_ip_settings(interface, data))
 
+async def check_router()->None:
+    config_file = pathlib.Path(sys.argv[1]) / 'config' / 'config.toml'
+    try:
+        with config_file.open('rb') as f:
+            cfg = tomllib.load(f)
+    except:
+        print('Konfiguration nicht geladen')
+        return
+    has_plugin_data = False
+    for p_data in cfg.get('plugins', []):
+        if p_data.get('name') == 'network':
+            has_plugin_data = True
+            data = p_data.get('router', {})
+    if not has_plugin_data:
+        return
+    p = await asyncio.subprocess.create_subprocess_shell(f'mkdir -p /etc/ntftables', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+    await p.wait()
+    file = pathlib.Path('/etc/ntftables') / f'nft-stat-{data.get("name", "lcars")}.nft'
+    with file.open('w') as f:
+        f.write('flush ruleset\n\n')
+        f.write('table inet ap {\n')
+        f.write('  chain routethrough {\n    type nat hook postrouting priority filter; policy accept;\n    oifname "')
+        f.write(data.get('dest', ''))
+        f.write('" masquerade\n  }\n\n')
+        f.write('  chain fward {\n    type filter hook forward priority filter; policy accept;\n    iifname "')
+        f.write(data.get('dest', ''))
+        f.write('" oifname "')
+        f.write(data.get('source', ''))
+        f.write('" ct state established,related accept\n    iifname "')
+        f.write(data.get('source', ''))
+        f.write('" oifname "')
+        f.write(data.get('dest', ''))
+        f.write('" accept\n  }\n')
+        f.write('}\n')
+    p = await asyncio.subprocess.create_subprocess_shell(f'chmod +x {str(file)}', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+    await p.wait()
+    file_conf = pathlib.Path('/etc/nftables.conf')
+    with file_conf.open() as f:
+        lines = f.read().split('\n')
+    for line in lines:
+        if line.startswith(f'include "{file}"'):
+            break
+    else:
+        lines.append(f'include "{file}"')
+        lines.append('')        
+    with file_conf.open('w') as f:
+        f.write('\n'.join(lines))
+    p = await asyncio.subprocess.create_subprocess_shell('systemctl enable nftables ; systemctl restart nftables', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+    await p.wait()
+
 if __name__ == "__main__":
     asyncio.run(check_networkmanger())
     asyncio.run(check_wifi())
+    asyncio.run(check_router())
+    
