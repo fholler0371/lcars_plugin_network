@@ -109,7 +109,11 @@ async def check_wifi()->None:
                 ssid = line.split(' ')[-1]
         if ssid == data.get('default', ''):
             return #ssid richtig
-        password = data.get(data.get("default", ""), '')
+        password = data.get(data.get("default", ""), '') 
+        p = await asyncio.subprocess.create_subprocess_shell('nmcli dev wifi list', 
+                                                         stderr=asyncio.subprocess.PIPE, 
+                                                         stdout=asyncio.subprocess.PIPE)
+        await p.wait()
         p = await asyncio.subprocess.create_subprocess_shell(f'nmcli device wifi connect {data.get("default", "")} password {password}', 
                                                          stderr=asyncio.subprocess.PIPE, 
                                                          stdout=asyncio.subprocess.PIPE)
